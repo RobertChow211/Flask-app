@@ -1,0 +1,153 @@
+{% extends "main.html" %}
+{% block dispContent %}
+    <div class="container-fluid" >
+        <div class="row justify-content-center align-items-end">
+            <form class="needs-validation col-lg-8 col-xl-8" action="{{ url_for('viewMonthlyTransaction') }}" method="post" role="form">
+                {{ form.csrf_token }}
+                <div class="form-row">
+                    
+                    <div class="col-md-4 row">
+                        <div class="col-md-5 row">
+                            <label class="control-label col-sm-2 requiredField" for="date">
+                                From
+                            </label>
+                        </div>
+                        <div class="col-md-7 row">
+                            <div class="input-group">
+                                <input class="form-control" id="date" name="fromDate" placeholder="MM/DD/YYYY" type="text"/>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 row">
+                        <div class="col-md-5 row">
+                            <label class="control-label col-sm-2 requiredField" for="date">
+                                To
+                            </label>
+                        </div>
+                        <div class="col-md-7 row">
+                            <div class="input-group">
+                                <input class="form-control" id="date" name="toDate" placeholder="MM/DD/YYYY" type="text"/>
+                            </div>
+                        </div>
+                    </div>
+
+                    
+                    <div class="col-md-4 mb-3">
+                        <button class="btn btn-primary float-right" type="submit">Submit</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    <h4>In Transaction Details</h4>
+    <hr>
+    <div class="container-fluid" >
+        <div class="row" style="display:block; width:100%; max-width: 1000px; margin:auto;">        
+            <table  id="dtBasicExample" class="table table-striped table-bordered table-sm" cellspacing="0" width="100%">
+            <thead>
+                <tr>
+                    <th class="th-sm">
+                        ID
+                    </th>
+                    <th class="th-sm">
+                        Name
+                    </th>
+                    <th class="th-sm">
+                        Product Name
+                    </th>
+                    <th class="th-sm">
+                        Units
+                    </th>
+                    <th class="th-sm">
+                        Amount
+                    </th>
+                    <th class="th-sm">
+                        Date
+                    </th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if inTransactions %}
+                    {% for inTransaction in inTransactions %}
+                        <tr key="{{ inTransaction[0] }}" >
+                            <td>{{ inTransaction[0] }}</td>
+                            <td>{{ inTransaction[9] }}</td>
+                            <td>{{ inTransaction[8] }}</td>
+                            <td>{{ inTransaction[4] }}</td>
+                            <td>{{ inTransaction[5] }}</td>
+                            <td>{{ inTransaction[7] }}</td>
+                        </tr>
+                    {% endfor %}
+                {% endif %}              
+            </tbody>
+            </table>
+        </div>
+    </div>
+
+    <h4>Out Transaction Details</h4>
+    <hr>
+    <div class="container-fluid" >
+        <div class="row" style="display:block; width:100%; max-width: 1000px; margin:auto;">        
+            <table  id="dtBasicExample" class="table table-striped table-bordered table-sm" cellspacing="0" width="100%">
+            <thead>
+                <tr>
+                    <th class="th-sm">
+                        ID
+                    </th>
+                    <th class="th-sm">
+                        Name
+                    </th>
+                    <th class="th-sm">
+                        Product Name
+                    </th>
+                    <th class="th-sm">
+                        Units
+                    </th>
+                    <th class="th-sm">
+                        Amount
+                    </th>
+                    <th class="th-sm">
+                        Date
+                    </th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if outTransactions %}
+                    {% for outTransaction in outTransactions %}
+                        <tr key="{{ outTransaction[0] }}" >
+                            <td>{{ outTransaction[0] }}</td>
+                            <td>{{ outTransaction[9] }}</td>
+                            <td>{{ outTransaction[8] }}</td>
+                            <td>{{ outTransaction[4] }}</td>
+                            <td>{{ outTransaction[5] }}</td>
+                            <td>{{ outTransaction[7] }}</td>
+                        </tr>
+                    {% endfor %}
+                {% endif %}              
+            </tbody>
+            </table>
+        </div>
+    </div>
+{% endblock %}
+
+{% block bodyscript %}
+    <script type="text/javascript">
+        $(document).ready(function(){  
+            var from_input=$('input[name="fromDate"]'); //our date input has the name "date"
+            var to_input=$('input[name="toDate"]'); 
+            var container=$('.bootstrap-iso form').length>0 ? $('.bootstrap-iso form').parent() : "body";
+            from_input.datepicker({
+                format: 'yyyy-mm-dd',
+                container: container,
+                todayHighlight: true,
+                autoclose: true,
+            })
+            to_input.datepicker({
+                format: 'yyyy-mm-dd',
+                container: container,
+                todayHighlight: true,
+                autoclose: true,
+            })
+        });
+    </script>
+{% endblock %}

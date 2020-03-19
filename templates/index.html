@@ -1,0 +1,65 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    {% include 'includes/head.html' %}
+    {% block head %}
+    {% endblock %}
+</head>
+
+<body>
+    {% block body %}
+    {% endblock %}
+    <!-- page-wrapper -->
+
+    {% include 'includes/script.html' %}
+    
+    {% block bodyscript %}
+    {% endblock %}
+    <script type="text/javascript">
+        $(document).ready(function(){
+            $(".sidebar-dropdown > a").click(function() {
+                $(".sidebar-submenu").slideUp(200);
+                if (
+                $(this)
+                    .parent()
+                    .hasClass("active")
+                ) {
+                $(".sidebar-dropdown").removeClass("active");
+                $(this)
+                    .parent()
+                    .removeClass("active");
+                } else {
+                $(".sidebar-dropdown").removeClass("active");
+                $(this)
+                    .next(".sidebar-submenu")
+                    .slideDown(200);
+                $(this)
+                    .parent()
+                    .addClass("active");
+                }
+            });
+
+            $("#close-sidebar").click(function() {
+                $(".page-wrapper").removeClass("toggled");
+            });
+            $("#show-sidebar").click(function() {
+                $(".page-wrapper").addClass("toggled");
+            });
+
+
+            datatable = $('#dtBasicExample').DataTable({
+                "searching": true, // false to disable search (or any other option)
+                "info": false,
+                "ordering": false,
+                "autoWidth": false,
+                "paging": true,
+                "pageLength": 15,
+                "lengthMenu": [[10, 15, 25, 50, -1], [10, 15, 25, 50, "All"]],
+                "bLengthChange" : false,
+            });
+        });
+    </script>
+</body>
+
+</html>
