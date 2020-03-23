@@ -5,7 +5,10 @@ from flask_mysqldb import MySQL
 from flask_wtf import Form,FlaskForm
 from wtforms import DateField, StringField, TextAreaField, PasswordField, validators
 from passlib.hash import sha256_crypt
-from extensions import csrf
+# from extensions import csrf
+from flask_wtf.csrf import CsrfProtect
+from time import gmtime, strftime
+from functools import wraps
 import bcrypt
 import pdfkit
 import hashlib
@@ -19,7 +22,8 @@ import os
 app = Flask(__name__)
 bootstrap = Bootstrap(app)
 app.secret_key = "secret key"
-csrf.init_app(app)
+# csrf.init_app(app)
+CsrfProtect(app)
 
 # Config MySQL
 app.config['MYSQL_HOST'] = 'localhost'
@@ -31,7 +35,7 @@ mysql = MySQL(app)
 
 @app.route("/")
 def main():
-   return render_template('dagger.html')
+   return redirect(url_for('login'))
 
 # ------------------------------------------------------------------------Register Router------------------------------------------------------------------------------------#
 class RdgisterForm(FlaskForm):
@@ -120,22 +124,54 @@ def is_logged_in(f):
             flash('Unauthorized, Please login', 'danger')
             return redirect(url_for('login'))
     return wrap
+
+@app.route('/logout')
+def sign_out():
+    session.pop('username')
+    session.pop('logged_in')
+    session.pop('email')
+    return redirect(url_for('login'))
 # ------------------------------------------------------------------------Dashboard Router------------------------------------------------------------------------------------#
 @app.route('/dashboard')
+@is_logged_in
 def dashboard():
    return render_template("dashboard.html")
 
+@app.route('/dashboard/getsparkdata', methods=['GET', 'POST'])
+@is_logged_in
+def getSparkData():
+    cur = mysql.connection.cursor()
+    
+    # Transaction In data by day
+    cur.execute("SELECT SUM(amount), DATE FROM TRANSACTION WHERE transaction_type = 'in' GROUP BY transaction.date ORDER BY transaction.date DESC LIMIT 7")
+    inTransactionData = cur.fetchall()
+    
+    cur.execute("SELECT SUM(amount), DATE FROM TRANSACTION WHERE transaction_type = 'out' GROUP BY transaction.date ORDER BY transaction.date DESC LIMIT 7")
+    outTransactionData = cur.fetchall()
+
+    cur.execute("SELECT SUM(quantity * cost) total FROM product")
+    totalProduct = cur.fetchone()
+
+    cur.execute("SELECT  transaction_type , SUM(amount) FROM TRANSACTION GROUP BY transaction_type ORDER BY transaction_type")
+    totalInOut = cur.fetchall()
+
+    cur.execute("SELECT product_name, quantity, (quantity * cost) AS total_cost FROM product")
+    productInfo = cur.fetchall()
+
+    cur.close()
+
+    return jsonify({'status':'success', 'inTransactionData': inTransactionData, 'outTransactionData': outTransactionData, 'totalProduct':totalProduct, 'totalInOut':totalInOut, 'productInfo': productInfo})
 
 # ------------------------------------------------------------------------Customer Router------------------------------------------------------------------------------------#
 class CustomerForm(FlaskForm):
     firstname = StringField('firstname', [validators.Length(min=1, max=10)])
     lastname = StringField('lastname', [validators.Length(min=1, max=10)])
-    email = StringField('email', [validators.Length(min=1, max=20)])
+    email = StringField('email', [validators.Length(min=1, max=30)])
     contact = StringField('contact', [validators.Length(min=10, max=13)])
     address = TextAreaField('address', [validators.Length(min=1)])
 
-@app.route('/customer', methods=['GET', 'POST'])
-#@is_logged_in
+@app.route('/customer/view', methods=['GET', 'POST'])
+@is_logged_in
 def viewCustomer():
     cur = mysql.connection.cursor()
     
@@ -145,7 +181,7 @@ def viewCustomer():
     return render_template('viewCustomer.html', customers = data)
 
 @app.route('/customer/add', methods=['GET', 'POST'])
-#@is_logged_in
+@is_logged_in
 def addCustomer():
     form = CustomerForm(request.form)
     if form.validate() :
@@ -168,7 +204,7 @@ def addCustomer():
         return render_template('addCustomer.html', form=form)
 
 @app.route('/customer/edit/<int:id>', methods=['GET', 'POST'])
-#@is_logged_in
+@is_logged_in
 def editCustomer(id):
     form = CustomerForm(request.form)
     if request.method == 'POST':
@@ -200,7 +236,7 @@ def editCustomer(id):
         return render_template('editCustomer.html', form=form, customer=data)
 
 @app.route('/customer/delete', methods=['GET', 'POST'])
-#@is_logged_in
+@is_logged_in
 def deleteCustomer():
     cur = mysql.connection.cursor()
     cur.execute("DELETE FROM customer WHERE customer_id = %s", [request.form['customer_id']])
@@ -216,7 +252,7 @@ class ProductForm(FlaskForm):
     cost = StringField('cost', [validators.Length(min=1)])
 
 @app.route('/stock', methods=['GET', 'POST'])
-#@is_logged_in
+@is_logged_in
 def viewProduct():
     cur = mysql.connection.cursor()
     
@@ -226,7 +262,7 @@ def viewProduct():
     return render_template('viewProduct.html', products = data)
 
 @app.route('/product/add', methods=['GET', 'POST'])
-#@is_logged_in
+@is_logged_in
 def addProduct():
     form = ProductForm(request.form)
     if request.method == 'POST':
@@ -251,7 +287,7 @@ def addProduct():
         return render_template('addProduct.html', form=form)
 
 @app.route('/product/edit/<int:id>', methods=['GET', 'POST'])
-#@is_logged_in
+@is_logged_in
 def editProduct(id):
     form = ProductForm(request.form)
     cur = mysql.connection.cursor()
@@ -280,7 +316,7 @@ def editProduct(id):
     return render_template('editProduct.html', form=form, product=data, success=success)
 
 @app.route('/product/delete', methods=['GET', 'POST'])
-#@is_logged_in
+@is_logged_in
 def deleteProduct():
     cur = mysql.connection.cursor()
     cur.execute("DELETE FROM product WHERE product_id = %s", [request.form['product_id']])
@@ -291,12 +327,12 @@ def deleteProduct():
 # ------------------------------------------------------------------------Supplier Router------------------------------------------------------------------------------------#
 class SupplierForm(FlaskForm):  
     supplierName = StringField('supplierName', [validators.Length(min=1, max=30)])
-    email = StringField('email', [validators.Length(min=1, max=20)])
+    email = StringField('email', [validators.Length(min=1, max=30)])
     phone = StringField('phone', [validators.Length(min=9, max=13)])
     address = TextAreaField('address', [validators.Length(min=1)])
 
-@app.route('/supplier', methods=['GET', 'POST'])
-#@is_logged_in
+@app.route('/supplier/view', methods=['GET', 'POST'])
+@is_logged_in
 def viewSupplier():
     cur = mysql.connection.cursor()
     
@@ -306,7 +342,7 @@ def viewSupplier():
     return render_template('viewSupplier.html', suppliers = data)
 
 @app.route('/supplier/add', methods=['GET', 'POST'])
-#@is_logged_in
+@is_logged_in
 def addSupplier():
     form = SupplierForm(request.form)
     if request.method == 'POST':
@@ -332,7 +368,7 @@ def addSupplier():
 
 
 @app.route('/supplier/edit/<int:id>', methods=['GET', 'POST'])
-#@is_logged_in
+@is_logged_in
 def editSupplier(id):
     form = SupplierForm(request.form)
     if request.method == 'POST':
@@ -370,7 +406,7 @@ def editSupplier(id):
         return render_template('editSupplier.html', form=form, supplier=data)
 
 @app.route('/supplier/delete', methods=['GET', 'POST'])
-#@is_logged_in
+@is_logged_in
 def deleteSupplier():
     cur = mysql.connection.cursor()
     cur.execute("DELETE FROM supplier WHERE supplier_id = %s", [request.form['supplier_id']])
@@ -395,6 +431,7 @@ class OutTransactionForm(FlaskForm):
     date = StringField('date', [validators.Length(min=1)])
 
 @app.route('/transaction/in', methods=['GET', 'POST'])
+@is_logged_in
 def inTransaction():
     form = InTransactionForm(request.form)
     if request.method == 'POST':
@@ -431,6 +468,7 @@ def inTransaction():
     return render_template('addInTransaction.html', form = form, suppliers = supplierData, products = productData, success = success)
 
 @app.route('/transaction/out', methods=['GET', 'POST'])
+@is_logged_in
 def outTransaction():
     form = OutTransactionForm(request.form)
     if request.method == 'POST':
@@ -467,7 +505,7 @@ def outTransaction():
     return render_template('addOutTransaction.html', form = form, customers = customerData, products = productData, success = success)
 
 @app.route('/transaction/getproduct/<int:id>', methods=['GET', 'POST'])
-#@is_logged_in
+@is_logged_in
 def getProduct(id):
     cur = mysql.connection.cursor()
     cur.execute("SELECT * FROM product WHERE product_id = %s LIMIT 1" , [id])
@@ -481,7 +519,7 @@ class ReportForm(FlaskForm):
     transactionType = StringField('transactionType')
 
 @app.route('/reports', methods=['GET', 'POST'])
-#@is_logged_in
+@is_logged_in
 def viewTransaction():
     form = ReportForm(request.form)
     cur = mysql.connection.cursor()
@@ -504,35 +542,39 @@ def viewTransaction():
             
         if result > 0:
             data = cur.fetchall()
-            return render_template('viewTransaction.html', transactions=data, form=form)
+            return render_template('viewTransaction.html', transactions=data, trId=transactionId, trType=transactionType, form=form)
         else:
-            return render_template('viewTransaction.html', form=form)
+            return render_template('viewTransaction.html',trId=transactionId, trType=transactionType, form=form)
 
 # -----------------------------------------------------------------------Monthly Reports Router------------------------------------------------------------------------------------#
 class MonthlyReportForm(FlaskForm):  
     fromDate = StringField('fromDate', [validators.Length(min=1, max=30)])
     toDate = StringField('toDate', [validators.Length(min=1, max=30)])
 
-@app.route('/reports/monthly', methods=['GET', 'POST'])
-#@is_logged_in
+@app.route('/currentmonth', methods=['GET', 'POST'])
+@is_logged_in
 def viewMonthlyTransaction():
     form = MonthlyReportForm(request.form)
     cur = mysql.connection.cursor()
     if request.method == 'GET':
-        return render_template('viewMonthlyTransaction.html', form=form)
+
+        fromDate = strftime("%Y-%m")+'-01'
+        toDate = strftime("%Y-%m-%d", gmtime())
     else:
         fromDate = form.fromDate.data
         toDate = form.toDate.data   
 
-        inResult = cur.execute("SELECT tr.*,  pr.product_name, sp.supplier_name  FROM webapp.transaction AS tr LEFT JOIN supplier AS sp ON tr.`from_to` = sp.`supplier_id` LEFT JOIN product AS pr ON tr.product =  pr.product_id WHERE tr.date >  %s And tr.date < %s ORDER BY tr.transaction_id ASC", [fromDate, toDate])
-        inData = cur.fetchall()            
-        
-        outResult = cur.execute("SELECT tr.*, pr.product_name, ct.firstname, ct.lastname FROM webapp.transaction AS tr LEFT JOIN customer AS ct ON tr.`from_to` = ct.`customer_id` LEFT JOIN product AS pr ON tr.product =  pr.product_id WHERE tr.date >  %s And tr.date < %s ORDER BY tr.transaction_id ASC", [fromDate, toDate])
-        outData = cur.fetchall()
+    inResult = cur.execute("SELECT tr.*,  pr.product_name, sp.supplier_name  FROM webapp.transaction AS tr LEFT JOIN supplier AS sp ON tr.`from_to` = sp.`supplier_id` LEFT JOIN product AS pr ON tr.product =  pr.product_id WHERE tr.date >=  %s And tr.date <= %s AND tr.transaction_type='in' ORDER BY tr.transaction_id ASC", [fromDate, toDate])
+    inData = cur.fetchall()
+    
+    outResult = cur.execute("SELECT tr.*, pr.product_name, ct.firstname, ct.lastname FROM webapp.transaction AS tr LEFT JOIN customer AS ct ON tr.`from_to` = ct.`customer_id` LEFT JOIN product AS pr ON tr.product =  pr.product_id WHERE tr.date >=  %s And tr.date <= %s AND tr.transaction_type='out' ORDER BY tr.transaction_id ASC", [fromDate, toDate])
+    outData = cur.fetchall()
 
-        return render_template('viewMonthlyTransaction.html', inTransactions=inData, outTransactions=outData, form=form)
+    return render_template('viewMonthlyTransaction.html', inTransactions=inData, outTransactions=outData, form=form)
+    
 # -----------------------------------------------------------------------Update page------------------------------------------------------------------------------------#
 @app.route('/update',methods=['POST','GET'])
+@is_logged_in
 def update():
 
     if request.method == 'POST':
